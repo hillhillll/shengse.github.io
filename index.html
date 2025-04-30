@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="css/global.css">
+    <title>DEMO- Experiment</title>
+</head>
+
+<body>
+    <div class="exp-wrap">
+        <div id="exp"></div>
+    </div>
+    <div id="mask" class="hidden"></div>
+    <div style="background-color: rgb(122, 122, 122); width: 100%; height: 100vh;"></div>
+    <script src="js/utils.js"></script>
+    <script src="js/jspsy-micro.js"></script>
+    <script src="js/res.js"></script>    
+    <script src="js/faces.js"></script> 
+    <script src="jss.js"></script> 
+    <script type="text/javascript">
+        let instr_page1 = {
+            instr: '欢迎参加本次心理学研究项目。在接下来的实验中，您将看到一组特别拍摄的照片，这些照片记录了多组人物在两种截然不同情绪状态下的面部表情：' + 
+            '一种是他们处于内心平静、生活安稳的状态；另一种则是他们在经历重大人生变故后深陷悲痛的状态。' + 
+            '这些参与者来自不同的背景，但他们都有一个共同点——最近因生活中的一件重大痛苦事件（如失去一位至亲、经历突如其来的分离或面临重大的人生挫折）而承受着巨大的心理压力。' + 
+            '为了完成这项研究，我们与每位参与者进行了深入沟通，并获得了他们的同意，用镜头记录下他们在这一特殊时期的真实情感流露。' + 
+            '所有照片均以尊重隐私为前提拍摄，并经过严格筛选，以确保内容的真实性与代表性。' ,            
+            rest: '本阶段实验结束，请稍作休息。',
+            end: '实验结束，浏览器正在下载结果，请稍候......<br>请将结果results.txt文件上传到问卷星。<br>感谢您的参与！',
+            stumili: [],
+        };
+        let instr_page2 = {
+            instr: '在第一组照片中，您会看到他们在日常生活中放松、自然的模样，展现出平和与安宁的情绪状态。' + 
+            '而在第二组照片中，您将目睹他们面对亲人离世后的深刻悲痛。从紧绷的眉头到黯淡的眼神，每一个细节都反映了他们内心无法掩饰的伤痛。两组照片将随机呈现。<br><br><br><br>按空格键继续',
+            stumili: [],
+        };
+        let question = {
+            instr: '你觉得照片中的人有多痛苦？',
+            Q1: '你觉得照片中的人有多痛苦？',
+            Q2: '观看照片后，你感觉自己有多不舒服？',
+            Q3: '你有多想安慰他/她？',
+            Q4: '你有多想帮助他/她？',
+            Q5: '你愿意从你的实验报酬（例如10元）中拿出多少元来分享给他/她以表示安慰？',
+            Q6: '你是否曾有过类似的经历，表现出与图片中相似的情绪表情？',
+            Q7: '下面有７组图形，请问哪一组最能代表你和他/她之间的关系？',
+            instr: '请根据你对照片的感受，选择最符合你内心想法的选项。<br>1表示“没有痛苦”，7表示“非常痛苦”。<br>请在下面的刻度上选择一个数字，按下空格键继续。',
+            scale: '1——2——3——4——5——6——7',
+            scale2: '1——2——3——4——5——6——7——8——9——10',
+            scale_label: '一点也不————————————————>非常',
+            scale_label2: '一点也不————————————————>非常',
+            stumili: [],
+        };
+
+        const questionImg = [
+                'imgs/N1_cognitive_empathy_negative.jpg',
+                'imgs/N2_affective_empathy_negative.jpg',
+                'imgs/N3_prosocial_conform.jpg',
+                'imgs/N4_prosocial_help.jpg',
+                'imgs/N5_prosocial_donate_negative.jpg',
+                'imgs/N6_cognitive_similarity.jpg',
+                'imgs/N7_IOS.jpg'
+            ];
+
+        // 从给定数组中随机抽取一定的元素，元素位置不相邻
+        function getTargetIdx(arr_len, n) {
+            let resp = [];
+            let temp_arr = Array.from({ length: arr_len }, (v, i) => i);
+            let rnd_idx;
+            for (let i = 0; i < n; i++) {
+                rnd_idx = Math.floor(Math.random() * temp_arr.length);
+                resp.push(temp_arr[rnd_idx]);
+                temp_arr.splice(rnd_idx, 2);
+                if (rnd_idx != 0) {
+                    temp_arr.splice(rnd_idx - 1, 1);
+                }
+            }
+            return resp;
+        }
+
+        // 生成从a到b的随机数
+        function randomNumber(a = 1, b = 32) {
+            // 这两个函数会做个类型转换, 假如含有其他字符,返回的是NaN
+            let max = Math.max(a, b);
+            let min = Math.min(a, b);
+            if (isNaN(max)) throw "参数不规范!";
+            return Math.floor(Math.random() * (max - min + 1) + min);            
+        }
+
+        // 呈现随机时间的十字注视点
+        async function dispFixationCross() {
+            // 加载十字注视点图片
+            let cross = jspsycho.fillImg({ url: 'imgs/cross.png', x: 300, y: 200, w: 50, h: 50 });
+            jspsycho.putObjToCenter(cross);
+
+            // 更新屏幕以显示十字注视点
+            await jspsycho.flip();
+            await jspsycho.render();
+
+            // 随机生成注视点呈现时间（例如 500ms 到 1500ms）
+            const randomDuration = randomNumber(500, 500); // 随机时间范围：500ms 到 1500ms
+            await jspsycho.waitMiSec(randomDuration); // 等待随机时间
+
+            // 清空屏幕
+            await jspsycho.flip();
+            await jspsycho.render();
+        }
+    
+       // 检索本地图片，并随机呈现本地图片
+        async function dispFace(face) {
+            // 显示图片
+            let img = jspsycho.fillImg({ url: face, x: 100, y: 300, w: 200, h: 250 });
+            jspsycho.putObjToCenter(img);
+            await jspsycho.flip();
+            await jspsycho.render();
+
+            // 固定呈现时间（例如 1000 毫秒，即 1 秒）
+            await jspsycho.waitMiSec(2000); // 等待 1 秒
+
+            // 清空屏幕
+            await jspsycho.flip();
+            await jspsycho.render();
+        }
+
+        // 呈现问题图片，并记录对每个问题的反应和反应时
+        async function dispQuestionImg(face) {
+            const results = []; // 用于存储每个问题的回答和反应时间
+
+            // 遍历问题图片数组
+            for (let i = 0; i < questionImg.length; i++) {
+                // 显示问题图片
+                let img = jspsycho.fillImg({ url: questionImg[i], x: 100, y: 300, w: 800, h: 600 });
+                jspsycho.putObjToCenter(img);
+
+                // 显示面孔刺激
+                jspsycho.fillImg({ url: face, x: 350, y: 20, w: 100, h: 125 });
+
+                await jspsycho.flip();
+                await jspsycho.render();
+
+                // 收集被试的按键反应和反应时间
+                const validKeys = ['Digit0', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9',
+                            'Numpad0', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'Numpad5', 'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9','KeyP', 'Space']; // 允许的按键
+                const response = await waitPressKeyAndMs(10000, validKeys); // 最多等待 10 秒
+
+                // 记录回答和反应时间
+                results.push({
+                    questionImg: questionImg[i], // 当前问题图片
+                    response: response ? response.e.code : 'miss', // 被试的按键反应（或 "miss" 表示未按键）
+                    reactionTime: response ? response.dur : null // 反应时间（毫秒）
+                });
+
+                // 清空屏幕
+                await jspsycho.flip();
+                await jspsycho.render();
+
+                // 等待短暂间隔（例如 500 毫秒）再显示下一个问题
+                await jspsycho.waitMiSec(500);
+            }
+
+            return results; // 返回所有问题的回答和反应时间
+        }
+
+        // 辅助函数：等待按键反应并记录反应时间
+        async function waitPressKeyAndMs(timeout, validKeys) {
+            return new Promise((resolve) => {
+                let startTime = Date.now();
+                let keyListener = (e) => {
+                    if (validKeys.includes(e.code)) {
+                        resolve({ e, dur: Date.now() - startTime });
+                        document.removeEventListener('keydown', keyListener);
+                    }
+                };
+                document.addEventListener('keydown', keyListener);
+
+                setTimeout(() => {
+                    resolve(null); // 超时未按键
+                    document.removeEventListener('keydown', keyListener);
+                }, timeout);
+            });
+        }
+
+        ///////////////////////////////////////////////////////////////////////
+        // 主实验函数
+        ///////////////////////////////////////////////////////////////////////
+        async function exp() {
+            // 记录实验开始时间
+            startTime = getStartTime();
+
+            // 实验参数
+            let curr_stumi, timer, kb, cross, resp;
+            let results = [];
+
+            // 收集被试信息
+            subjectInfo = await collectParticipantInfo();
+
+            results.push({
+                subjectInfo: subjectInfo
+            });
+            
+            ///////////////////////////////////////////////////////////////////////
+            // 初始化实验数据
+            ///////////////////////////////////////////////////////////////////////
+            jspsycho.init(_default);
+            jspsycho.fillText({ content: '加载中，请稍后....' });
+            await jspsycho.flip();
+            await jspsycho.render();
+            jspsycho.putObjToCenter(jspsycho.lastDOM);          
+           
+            const Neutral_Face = [
+                'imgs/CH_N_F_02.jpg'
+            ];
+            const Painful_Face = [
+                'imgs/CH_P_F_02.jpg'
+            ];
+            const AllFace = Neutral_Face.concat(Painful_Face); // 所有刺激
+           
+            //AllFace = Neutral_Face.concat(Painful_Face); // 所有刺激
+
+            
+            // 预加载所有图片
+            const imageList = AllFace.concat(Questions); // 所有刺激 + 所有问题图片
+
+            preloadImagesWithProgress(imageList, progress => {
+                console.log(`已加载: ${(progress * 100).toFixed(0)}%`);
+                document.getElementById('loading-progress').innerText =
+                    `加载中... ${Math.round(progress * 100)}%`;
+            }).then(() => {
+                // 隐藏加载界面，开始实验
+                document.getElementById('loading-screen').style.display = 'none';
+                startExperiment();
+            });
+            
+
+            ///////////////////////////////////////////////////////////////////////
+            // 显示指导语
+            ///////////////////////////////////////////////////////////////////////
+            // 第一页
+            jspsycho.fillText({ content: instr_page1.instr, class_: ['instr'] });
+            await jspsycho.flip();
+            await jspsycho.render();
+            jspsycho.putObjToCenter(jspsycho.lastDOM);
+            kb = await jspsycho.waitKB(); // 等待按键继续
+
+            // 第二页
+            jspsycho.fillText({ content: instr_page2.instr, class_: ['instr'] });
+            await jspsycho.flip();
+            await jspsycho.render();
+            kb = await jspsycho.waitKB(); // 等待按键继续
+
+            // 全屏
+            fullScreen();
+
+            ///////////////////////////////////////////////////////////////////////
+            // 实验开始
+            ///////////////////////////////////////////////////////////////////////
+            for (let i = 0; i < AllFace.length; i++) {
+                // 清空屏幕
+                await jspsycho.flip();
+                await jspsycho.render();
+
+                // 随机选择一张面孔
+                const face = AllFace[randomNumber(0, AllFace.length - 1)];
+                await dispFace(face);
+                await dispFixationCross();
+
+                // 显示问题图片并记录反应
+                result = await dispQuestionImg(face);
+
+                // 显示面孔和问题
+                //await dispFaceQuestion(face);
+
+                // 收集被试的按键反应和反应时
+                //resp = await waitPressKeyAndMs(10000, [
+                //    'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9',
+                //   'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'Numpad5', 'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9'
+                //]);
+
+                // 保存每个 trial 的选项和被试反应
+                results.push({
+                    face: face,
+                    result: result,
+                    trialNumber: i + 1
+                });
+
+                // ITI（注视点呈现）
+                cross = jspsycho.fillImg({ url: 'imgs/cross.png', x: 300, y: 200, w: 50, h: 50 });
+                jspsycho.putObjToCenter(cross);
+                await jspsycho.flip();
+                await jspsycho.render();
+                await jspsycho.waitMiSec(randomNumber(500, 1500)); // 随机 ITI 时间
+            }
+
+            ///////////////////////////////////////////////////////////////////////
+            // 第一部分结束
+            ///////////////////////////////////////////////////////////////////////
+
+            // 退出全屏
+            exitFullScreen();
+
+            // 记录实验结束时间
+            endTime = getStartTime();
+            
+            // 实验总时长
+            expTime = getExperimentTime(startTime, endTime);
+
+            console.log('实验总时长：' + expTime + '秒');
+
+            // 将实验总时长添加到结果中
+            results.push({
+                expTime: expTime,
+                startTime: startTime,
+                endTime: endTime
+            });
+
+            // 显示实验结束信息
+            end = jspsycho.fillText({ content: instr_page1.end, class_: ['instr'] });
+            await jspsycho.flip();
+            await jspsycho.render();
+            jspsycho.putObjToCenter(end);
+
+            ///////////////////////////////////////////////////////////////////////
+            // 下载结果
+            ///////////////////////////////////////////////////////////////////////
+            download('result.txt', JSON.stringify(results));
+
+            // 判断按键是否符合
+            kb = await jspsycho.waitKB();
+            while (!['Space', 'KeyF'].includes(kb.e.code)) {
+                console.log(kb);
+                kb = await jspsycho.waitKB();
+            }
+        }
+
+        exp();
+
+    </script>
+</body>
+
+</html>
